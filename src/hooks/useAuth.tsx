@@ -25,6 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data);
     } catch (e) {
       setUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('codemind_token');
+      }
     } finally {
       setLoading(false);
     }
