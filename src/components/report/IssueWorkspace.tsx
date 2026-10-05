@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
   Shield, Bug, Gauge, Wrench, Search, Code2, Brain, Sparkles,
-  CheckCircle2, Copy, Check, FileCode, AlertTriangle, AlertCircle, Info, ChevronRight, Layers
+  CheckCircle2, Copy, Check, FileCode, AlertTriangle, AlertCircle, Info, ChevronRight, Layers, ArrowLeft
 } from 'lucide-react';
 import { Finding, ReviewFile } from '@/types/review';
 import { CodeViewer } from './CodeViewer';
@@ -35,6 +35,8 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
   const [sortBy, setSortBy] = useState<'severity' | 'line' | 'file'>('severity');
   const [detailTab, setDetailTab] = useState<'code' | 'explain' | 'fix' | 'memory'>('code');
   const [copiedFix, setCopiedFix] = useState(false);
+  const [copiedLocation, setCopiedLocation] = useState(false);
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
 
   // Filter findings
   const filteredFindings = findings.filter(f => {
@@ -64,6 +66,15 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
       navigator.clipboard.writeText(selectedFinding.fix_recommendation);
       setCopiedFix(true);
       setTimeout(() => setCopiedFix(false), 2000);
+    }
+  };
+
+  const handleCopyLocation = () => {
+    if (selectedFinding) {
+      const loc = `${selectedFinding.file_path}:${selectedFinding.line_number || 1}`;
+      navigator.clipboard.writeText(loc);
+      setCopiedLocation(true);
+      setTimeout(() => setCopiedLocation(false), 2000);
     }
   };
 
@@ -178,7 +189,7 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
       {/* 2-Column Synchronized Workspace with Independent Left/Right Scrolling */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch h-[calc(100vh-220px)] min-h-[640px] max-h-[850px]">
         {/* Left Column: Issues List (Independent Vertical Scroll) */}
-        <div className="lg:col-span-4 bg-[#121215] border border-zinc-800/90 rounded-2xl flex flex-col overflow-hidden shadow-xl">
+        <div className={`${showMobileDetail ? 'hidden lg:flex' : 'flex'} lg:col-span-4 bg-[#121215] border border-zinc-800/90 rounded-2xl flex-col overflow-hidden shadow-xl`}>
           <div className="p-3.5 border-b border-zinc-800/80 bg-[#18181b]/60 flex items-center justify-between text-xs font-mono">
             <span className="font-bold text-zinc-300">Detected Issues ({sortedFindings.length})</span>
             <span className="text-[10px] text-zinc-500 uppercase">Select to Inspect</span>
@@ -191,7 +202,10 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                 return (
                   <button
                     key={finding.id}
-                    onClick={() => setSelectedFindingId(finding.id)}
+                    onClick={() => {
+                      setSelectedFindingId(finding.id);
+                      setShowMobileDetail(true);
+                    }}
                     className={`w-full text-left p-3.5 rounded-xl border transition-all duration-150 flex items-start justify-between gap-3 ${
                       isSelected
                         ? 'bg-[#18181b] border-zinc-700 text-white shadow-lg ring-1 ring-zinc-700'
@@ -218,11 +232,19 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
         </div>
 
         {/* Right Column: Selected Issue Detail (Fixed Header + Independent Vertical Scroll) */}
-        <div className="lg:col-span-8 bg-[#121215] border border-zinc-800/90 rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+        <div className={`${!showMobileDetail ? 'hidden lg:flex' : 'flex'} lg:col-span-8 bg-[#121215] border border-zinc-800/90 rounded-2xl flex-col overflow-hidden shadow-2xl`}>
           {selectedFinding ? (
             <>
               {/* Finding Detail Header & Sub-Navigation Tabs (Fixed at Top of Detail View) */}
-              <div className="p-6 pb-4 border-b border-zinc-800/90 bg-[#141417] shrink-0 space-y-4">
+              <div className="p-4 sm:p-6 pb-4 border-b border-zinc-800/90 bg-[#141417] shrink-0 space-y-4">
+                {/* Mobile Back Button */}
+                <button
+                  onClick={() => setShowMobileDetail(false)}
+                  className="lg:hidden mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#18181b] border border-zinc-700 text-xs font-mono text-zinc-300 font-bold hover:bg-zinc-800 active:scale-95 transition-all"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Issues List
+                </button>
+
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -234,9 +256,28 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                         </span>
                       )}
                     </div>
-                    <h2 className="text-xl font-black text-white tracking-tight">{selectedFinding.title}</h2>
+                    <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">{selectedFinding.title}</h2>
                     <p className="text-xs text-zinc-300 leading-relaxed font-sans">{selectedFinding.description}</p>
                   </div>
+                </div>
+
+                {/* Target File & Error Location Banner */}
+                <div className="bg-[#09090b]/80 border border-zinc-800/90 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                  <div className="flex items-center gap-2 text-zinc-300 min-w-0">
+                    <span className="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-400 font-bold shrink-0">
+                      Line {selectedFinding.line_number || 1}
+                    </span>
+                    <span className="truncate font-semibold text-zinc-200" title={selectedFinding.file_path}>
+                      📁 {selectedFinding.file_path}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleCopyLocation}
+                    className="px-2.5 py-1 rounded-lg bg-[#18181b] hover:bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 font-mono flex items-center gap-1 shrink-0 transition-colors"
+                  >
+                    {copiedLocation ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-zinc-400" />}
+                    {copiedLocation ? 'Copied Location' : 'Copy File:Line'}
+                  </button>
                 </div>
 
                 {/* Sub-navigation Tabs: Code | Explanation | Suggested Fix | Hindsight Memory */}
