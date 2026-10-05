@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
   Settings, Cpu, Brain, Github, ShieldCheck, CheckCircle2, Save, Sparkles,
-  Sliders, Shield, FileCode, Check, RefreshCw, Key, ToggleLeft, ToggleRight
+  Sliders, Shield, FileCode, Check, Copy, RefreshCw, Key, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -17,6 +17,15 @@ export default function SettingsPage() {
   const [hindsightAutoRecall, setHindsightAutoRecall] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  const webhookUrl = "https://codemind-backend-sb3h.onrender.com/api/webhooks/github";
+
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +131,63 @@ export default function SettingsPage() {
             <Badge variant="success">
               <CheckCircle2 className="w-3 h-3" /> Connected
             </Badge>
+          </div>
+        </div>
+
+        {/* GitHub Webhook / CI/CD Card */}
+        <div className="bg-[#121215] border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+                <Github className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+                  🔗 GitHub Webhook / CI/CD Integration
+                </h2>
+                <p className="text-xs text-zinc-400 font-mono">
+                  Automatically trigger CodeMind scans whenever a Pull Request is opened or updated on GitHub
+                </p>
+              </div>
+            </div>
+            <Badge variant="success">
+              <CheckCircle2 className="w-3 h-3" /> Endpoint Live
+            </Badge>
+          </div>
+
+          <div className="space-y-4 font-mono text-xs">
+            <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4 space-y-2">
+              <label className="text-[10px] text-zinc-400 uppercase font-bold block">
+                GitHub Webhook Payload URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={webhookUrl}
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-emerald-300 font-mono select-all"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyWebhook}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold shrink-0 transition-all flex items-center gap-1.5 shadow"
+                >
+                  {copiedWebhook ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedWebhook ? 'Copied' : 'Copy URL'}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4 space-y-2">
+              <h4 className="text-xs font-bold text-white uppercase">Step-by-Step GitHub Setup Guide:</h4>
+              <ol className="list-decimal list-inside space-y-1.5 text-zinc-300 text-[11px] leading-relaxed font-sans">
+                <li>Go to your GitHub Repository ➔ <strong>Settings</strong> ➔ <strong>Webhooks</strong> ➔ Click <strong>Add webhook</strong>.</li>
+                <li>Paste Payload URL: <code className="text-emerald-300 bg-emerald-950/40 px-1 py-0.5 rounded font-mono">{webhookUrl}</code></li>
+                <li>Set Content type: <code className="text-emerald-300 bg-emerald-950/40 px-1 py-0.5 rounded font-mono">application/json</code></li>
+                <li>Select events: Choose <strong>"Let me select individual events"</strong> ➔ Check <strong>Pull requests</strong> & <strong>Pushes</strong>.</li>
+                <li>Click <strong>Add webhook</strong>. Every PR opened will now automatically trigger a zero-hallucination CodeMind code review!</li>
+              </ol>
+            </div>
           </div>
         </div>
       </div>
