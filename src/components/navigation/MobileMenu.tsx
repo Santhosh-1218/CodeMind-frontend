@@ -32,81 +32,81 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, isAppNa
           </button>
         </div>
 
-        <nav className="flex-1 py-6 space-y-4">
+        <nav className="flex-1 py-6 space-y-2 font-mono">
           {isAppNav ? (
             <>
               <Link
                 href="/app"
                 onClick={onClose}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-zinc-200 hover:bg-zinc-800/80 active:scale-98 transition-all border border-transparent hover:border-zinc-700"
               >
-                <Code2 className="w-5 h-5 text-white" />
-                Review Workspace
+                <Code2 className="w-4 h-4 text-emerald-400" />
+                <span>Review Workspace</span>
               </Link>
               <Link
                 href="/app/history"
                 onClick={onClose}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-zinc-200 hover:bg-zinc-800/80 active:scale-98 transition-all border border-transparent hover:border-zinc-700"
               >
-                <History className="w-5 h-5 text-zinc-400" />
-                History
+                <History className="w-4 h-4 text-blue-400" />
+                <span>Review History</span>
               </Link>
               <Link
                 href="/app/learning"
                 onClick={onClose}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-zinc-200 hover:bg-zinc-800/80 active:scale-98 transition-all border border-transparent hover:border-zinc-700"
               >
-                <Brain className="w-5 h-5 text-purple-400" />
-                Learning Memory
+                <Brain className="w-4 h-4 text-purple-400" />
+                <span>Hindsight Memory</span>
               </Link>
               <Link
                 href="/app/profile"
                 onClick={onClose}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-zinc-200 hover:bg-zinc-800/80 active:scale-98 transition-all border border-transparent hover:border-zinc-700"
               >
-                <User className="w-5 h-5 text-zinc-400" />
-                Profile
+                <User className="w-4 h-4 text-zinc-400" />
+                <span>Developer Profile</span>
               </Link>
               <Link
                 href="/app/settings"
                 onClick={onClose}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-zinc-200 hover:bg-zinc-800/80 active:scale-98 transition-all border border-transparent hover:border-zinc-700"
               >
-                <Settings className="w-5 h-5 text-zinc-400" />
-                Settings
+                <Settings className="w-4 h-4 text-zinc-400" />
+                <span>Settings</span>
               </Link>
             </>
           ) : (
             <>
-              <Link href="/how-it-works" onClick={onClose} className="block text-base font-medium text-zinc-300 hover:text-white py-2">
+              <Link href="/how-it-works" onClick={onClose} className="block text-sm font-semibold text-zinc-300 hover:text-white py-2.5 px-3 rounded-xl hover:bg-zinc-800/50">
                 How It Works
               </Link>
-              <Link href="/features" onClick={onClose} className="block text-base font-medium text-zinc-300 hover:text-white py-2">
+              <Link href="/features" onClick={onClose} className="block text-sm font-semibold text-zinc-300 hover:text-white py-2.5 px-3 rounded-xl hover:bg-zinc-800/50">
                 Features
               </Link>
-              <Link href="/about" onClick={onClose} className="block text-base font-medium text-zinc-300 hover:text-white py-2">
+              <Link href="/about" onClick={onClose} className="block text-sm font-semibold text-zinc-300 hover:text-white py-2.5 px-3 rounded-xl hover:bg-zinc-800/50">
                 About
               </Link>
             </>
           )}
         </nav>
 
-        <div className="pt-6 border-t border-zinc-800 space-y-3">
+        <div className="pt-6 border-t border-zinc-800 space-y-3 font-mono">
           {user ? (
             <Link href="/app" onClick={onClose}>
-              <Button variant="primary" className="w-full">
+              <Button variant="primary" className="w-full justify-center text-xs font-bold py-3 rounded-xl">
                 Open App Workspace
               </Button>
             </Link>
           ) : (
             <>
               <Link href="/login" onClick={onClose}>
-                <Button variant="outline" className="w-full justify-center">
+                <Button variant="outline" className="w-full justify-center text-xs font-bold py-3 rounded-xl">
                   Sign In
                 </Button>
               </Link>
               <Link href="/signup" onClick={onClose}>
-                <Button variant="primary" className="w-full justify-center">
+                <Button variant="primary" className="w-full justify-center text-xs font-bold py-3 rounded-xl">
                   Get Started Free
                 </Button>
               </Link>
