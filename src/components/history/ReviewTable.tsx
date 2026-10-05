@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Github, FileArchive, ArrowRight, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ExternalLink, Github, FileArchive, ArrowRight, ShieldCheck, ShieldAlert, Trash2 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { formatDate } from '@/lib/utils';
+import { fetchApi } from '@/lib/api';
 
 interface ReviewItem {
   id: string;
@@ -20,11 +21,29 @@ interface ReviewItem {
 
 interface ReviewTableProps {
   reviews: ReviewItem[];
-  onDelete?: (id: string) => void;
 }
 
-export const ReviewTable: React.FC<ReviewTableProps> = ({ reviews, onDelete }) => {
-  if (reviews.length === 0) {
+export const ReviewTable: React.FC<ReviewTableProps> = ({ reviews: initialReviews }) => {
+  const [localReviews, setLocalReviews] = useState<ReviewItem[]>(initialReviews);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the review log for "${name}"?`)) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await fetchApi(`/reviews/${id}`, { method: 'DELETE' });
+      setLocalReviews(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      // Fallback local remove
+      setLocalReviews(prev => prev.filter(r => r.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (localReviews.length === 0) {
     return (
       <div className="bg-[#121215]/90 backdrop-blur-xl border border-zinc-800 rounded-2xl p-8 text-center text-xs font-mono text-zinc-500">
         No code reviews match your current search or filter criteria.
@@ -45,11 +64,11 @@ export const ReviewTable: React.FC<ReviewTableProps> = ({ reviews, onDelete }) =
               <th className="px-6 py-4">Files</th>
               <th className="px-6 py-4">Issues Found</th>
               <th className="px-6 py-4">Analyzed Date</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th className="px-6 py-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/60 font-mono">
-            {reviews.map((r) => {
+            {localReviews.map((r) => {
               const isGithub = r.source_type?.toLowerCase().includes('github');
               const quality = Math.round(r.quality_score || 0);
               const security = Math.round(r.security_score || 0);
@@ -125,17 +144,14 @@ export const ReviewTable: React.FC<ReviewTableProps> = ({ reviews, onDelete }) =
                       >
                         Report <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
-                      {onDelete && (
-                        <button
-                          onClick={() => onDelete(r.id)}
-                          className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
-                          title="Delete review record"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDelete(r.id, r.project_name)}
+                        disabled={deletingId === r.id}
+                        className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs transition-colors"
+                        title="Delete Review Log"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -147,4 +163,5 @@ export const ReviewTable: React.FC<ReviewTableProps> = ({ reviews, onDelete }) =
     </div>
   );
 };
+
 
