@@ -20,6 +20,28 @@ export const SignupForm: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (err === 'github_oauth_missing_config') {
+        setError('GitHub OAuth is not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in backend .env or Render environment.');
+      } else if (err === 'google_oauth_missing_config') {
+        setError('Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend .env or Render environment.');
+      } else if (err === 'github_oauth_failed') {
+        setError('GitHub OAuth authentication failed. Please check credentials or try again.');
+      } else if (err === 'google_oauth_failed') {
+        setError('Google OAuth authentication failed. Please check credentials or try again.');
+      } else if (err === 'github_oauth_cancelled') {
+        setError('GitHub sign-in was cancelled.');
+      } else if (err === 'google_oauth_cancelled') {
+        setError('Google sign-in was cancelled.');
+      } else if (err) {
+        setError(`Authentication error: ${err}`);
+      }
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

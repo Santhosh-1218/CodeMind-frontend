@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { Github } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/api';
 
 export const GitHubButton: React.FC = () => {
   const handleGitHubLogin = () => {
-    const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-    const apiBase = rawApi.replace(/\/+$/, '');
+    const apiBase = getApiBaseUrl();
     window.location.href = `${apiBase}/auth/github`;
   };
 

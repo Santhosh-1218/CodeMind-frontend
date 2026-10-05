@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
+import { getApiBaseUrl } from '@/lib/api';
 
 export const GoogleButton: React.FC = () => {
   const handleGoogleLogin = () => {
-    const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-    const apiBase = rawApi.replace(/\/+$/, '');
+    const apiBase = getApiBaseUrl();
     window.location.href = `${apiBase}/auth/google`;
   };
 

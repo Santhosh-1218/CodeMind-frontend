@@ -1,4 +1,13 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+export function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://codemind-backend-sb3h.onrender.com/api';
+  }
+  return 'http://localhost:8000/api';
+}
 
 interface CacheItem {
   data: any;
@@ -43,7 +52,8 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const apiBase = getApiBaseUrl();
+  const url = endpoint.startsWith('http') ? endpoint : `${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   let res: Response;
   try {
