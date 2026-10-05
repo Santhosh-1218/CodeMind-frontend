@@ -40,13 +40,13 @@ export const ReviewProgress: React.FC<ReviewProgressProps> = ({ status }) => {
   };
 
   return (
-    <Card className="max-w-2xl mx-auto p-8 border border-zinc-800 bg-[#121215]">
+    <Card className="max-w-2xl mx-auto p-4 sm:p-8 border border-zinc-800 bg-[#121215]">
       <div className="text-center mb-8">
         <div className="inline-flex p-3 rounded-2xl bg-zinc-900 border border-zinc-800 text-purple-400 mb-3">
           <Brain className="w-8 h-8 animate-pulse" />
         </div>
-        <h2 className="text-2xl font-bold text-white tracking-tight">AI Code Review in Progress</h2>
-        <p className="text-xs text-zinc-400 mt-1 font-mono">{status.status_message}</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">AI Code Review in Progress</h2>
+        <p className="text-xs text-zinc-400 mt-1 font-mono break-words px-2">{status.status_message}</p>
       </div>
 
       <div className="space-y-4">
