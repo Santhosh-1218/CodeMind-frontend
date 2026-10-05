@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { History, Plus, FileCode2, ShieldAlert, Layers, Search, Filter, Github, FileArchive, Sparkles } from 'lucide-react';
+import { History, Plus, FileCode2, ShieldAlert, Layers, Search, Filter, Github, FileArchive, Sparkles, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import { ReviewTable } from '@/components/history/ReviewTable';
 import { Card } from '@/components/ui/Card';
@@ -24,13 +24,54 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'github' | 'zip'>('all');
+  const [isClearing, setIsClearing] = useState(false);
 
-  useEffect(() => {
+  const loadHistory = () => {
     fetchApi<HistoryData>('/history')
       .then(setData)
       .catch((e) => console.error(e))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadHistory();
   }, []);
+
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      await fetchApi(`/history/${reviewId}`, { method: 'DELETE' });
+      setData(prev => {
+        if (!prev) return null;
+        const updated = prev.recent_reviews.filter(r => r.id !== reviewId);
+        return {
+          ...prev,
+          total_reviews: updated.length,
+          recent_reviews: updated
+        };
+      });
+    } catch (err) {
+      console.error('Error deleting review:', err);
+    }
+  };
+
+  const handleClearAllHistory = async () => {
+    if (!window.confirm('Are you sure you want to clear all past review history and old database records?')) return;
+    setIsClearing(true);
+    try {
+      await fetchApi('/history/clear', { method: 'DELETE' });
+      setData({
+        total_reviews: 0,
+        total_projects: 0,
+        total_files: 0,
+        total_issues: 0,
+        recent_reviews: []
+      });
+    } catch (err) {
+      console.error('Error clearing history:', err);
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -73,11 +114,23 @@ export default function HistoryPage() {
             </p>
           </div>
 
-          <Link href="/app">
-            <Button variant="primary" size="md" className="font-mono text-xs uppercase tracking-wider font-bold shadow-lg shadow-white/5">
-              <Plus className="w-4 h-4 mr-1.5" /> Start New Review
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            {data && data.recent_reviews.length > 0 && (
+              <button
+                onClick={handleClearAllHistory}
+                disabled={isClearing}
+                className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95"
+                title="Clear old review history from Render database"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear All History
+              </button>
+            )}
+            <Link href="/app">
+              <Button variant="primary" size="md" className="font-mono text-xs uppercase tracking-wider font-bold shadow-lg shadow-white/5">
+                <Plus className="w-4 h-4 mr-1.5" /> Start New Review
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {data && data.recent_reviews.length > 0 ? (
@@ -172,7 +225,7 @@ export default function HistoryPage() {
             </div>
 
             {/* Table */}
-            <ReviewTable reviews={filteredReviews} />
+            <ReviewTable reviews={filteredReviews} onDelete={handleDeleteReview} />
           </>
         ) : (
           <EmptyState
