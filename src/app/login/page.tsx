@@ -1,12 +1,31 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Code2, ShieldCheck, Zap, Brain, Sparkles, CheckCircle2 } from 'lucide-react';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
+import { useAuth } from '@/hooks/useAuth';
+import { Loading } from '@/components/ui/Loading';
 
 export default function LoginPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/app');
+    }
+  }, [loading, user, router]);
+
+  if (loading || user) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+        <Loading message="Checking authentication session..." />
+      </div>
+    );
+  }
   return (
     <div className="relative min-h-screen bg-[#09090b] flex flex-col justify-between overflow-hidden">
       <AnimatedBackground />
