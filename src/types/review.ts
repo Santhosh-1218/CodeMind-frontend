@@ -14,6 +14,10 @@ export interface Finding {
   evidence: string[];
   memory_influenced: boolean;
   hindsight_memory_text?: string;
+  owasp_category?: string;
+  cwe_id?: string;
+  status?: 'open' | 'in_progress' | 'resolved' | 'false_positive';
+  assigned_to?: string;
 }
 
 export interface ReviewFile {

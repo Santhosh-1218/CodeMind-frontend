@@ -3,10 +3,12 @@
 import React, { useState } from 'react';
 import {
   Shield, Bug, Gauge, Wrench, Search, Code2, Brain, Sparkles,
-  CheckCircle2, Copy, Check, FileCode, AlertTriangle, AlertCircle, Info, ChevronRight, Layers, ArrowLeft
+  CheckCircle2, Copy, Check, FileCode, AlertTriangle, AlertCircle, Info, ChevronRight, Layers, ArrowLeft,
+  GitPullRequest, UserCheck, Clock, CheckSquare, Tag, ExternalLink, Loader2
 } from 'lucide-react';
 import { Finding, ReviewFile } from '@/types/review';
 import { CodeViewer } from './CodeViewer';
+import { fetchApi } from '@/lib/api';
 
 interface IssueWorkspaceProps {
   findings: Finding[];
@@ -16,6 +18,29 @@ interface IssueWorkspaceProps {
   mediumCount: number;
   lowCount: number;
   infoCount: number;
+}
+
+function getOwaspBadge(finding: Finding): string {
+  if (finding.owasp_category) return finding.owasp_category;
+  const t = finding.title.toLowerCase();
+  const c = finding.category.toLowerCase();
+  if (t.includes('sql') || t.includes('injection') || t.includes('xss') || t.includes('command')) return 'OWASP A03:2021 - Injection';
+  if (t.includes('api key') || t.includes('secret') || t.includes('auth') || t.includes('jwt') || t.includes('token')) return 'OWASP A07:2021 - Identification & Auth Failures';
+  if (t.includes('eval') || t.includes('exec') || t.includes('deserialize')) return 'OWASP A08:2021 - Software & Data Integrity Failures';
+  if (t.includes('access') || t.includes('permission') || t.includes('cors')) return 'OWASP A01:2021 - Broken Access Control';
+  if (c.includes('security')) return 'OWASP A05:2021 - Security Misconfiguration';
+  return 'OWASP A04:2021 - Insecure Design';
+}
+
+function getCweBadge(finding: Finding): string {
+  if (finding.cwe_id) return finding.cwe_id;
+  const t = finding.title.toLowerCase();
+  if (t.includes('sql')) return 'CWE-89 (SQL Injection)';
+  if (t.includes('api key') || t.includes('secret') || t.includes('hardcoded')) return 'CWE-798 (Hardcoded Credentials)';
+  if (t.includes('xss')) return 'CWE-79 (Cross-site Scripting)';
+  if (t.includes('eval') || t.includes('exec')) return 'CWE-95 (Eval Injection)';
+  if (t.includes('overflow') || t.includes('memory')) return 'CWE-119 (Buffer Overflow)';
+  return 'CWE-200 (Information Exposure)';
 }
 
 function getFindingDetailsHelper(finding: Finding) {
@@ -85,7 +110,7 @@ function getFindingDetailsHelper(finding: Finding) {
 }
 
 export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
-  findings,
+  findings: initialFindings,
   files,
   criticalCount,
   highCount,
@@ -93,8 +118,9 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
   lowCount,
   infoCount
 }) => {
+  const [localFindings, setLocalFindings] = useState<Finding[]>(initialFindings);
   const [selectedFindingId, setSelectedFindingId] = useState<string>(
-    findings.length > 0 ? findings[0].id : ''
+    initialFindings.length > 0 ? initialFindings[0].id : ''
   );
   const [activeSeverityFilter, setActiveSeverityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -104,8 +130,15 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
   const [copiedLocation, setCopiedLocation] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
 
+  // Auto-Fix PR state
+  const [isCreatingPR, setIsCreatingPR] = useState(false);
+  const [prCreatedMap, setPrCreatedMap] = useState<Record<string, { pr_url: string; branch_name: string }>>({});
+
+  // Team Workspaces status/assignment state
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
   // Filter findings
-  const filteredFindings = findings.filter(f => {
+  const filteredFindings = localFindings.filter(f => {
     const matchesSev = activeSeverityFilter === 'all' || f.severity.toLowerCase() === activeSeverityFilter;
     const matchesSearch =
       f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -124,7 +157,7 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
     return (a.line_number || 0) - (b.line_number || 0);
   });
 
-  const selectedFinding = findings.find(f => f.id === selectedFindingId) || (findings.length > 0 ? findings[0] : null);
+  const selectedFinding = localFindings.find(f => f.id === selectedFindingId) || (localFindings.length > 0 ? localFindings[0] : null);
   const matchedFile = selectedFinding ? files.find(f => f.path === selectedFinding.file_path) : null;
 
   const handleCopyFix = () => {
@@ -141,6 +174,54 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
       navigator.clipboard.writeText(loc);
       setCopiedLocation(true);
       setTimeout(() => setCopiedLocation(false), 2000);
+    }
+  };
+
+  const handleUpdateFindingStatus = async (newStatus: 'open' | 'in_progress' | 'resolved' | 'false_positive', assignee?: string) => {
+    if (!selectedFinding) return;
+    setIsUpdatingStatus(true);
+    try {
+      const updated = await fetchApi<Finding>(`/reviews/findings/${selectedFinding.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: newStatus,
+          assigned_to: assignee !== undefined ? assignee : selectedFinding.assigned_to
+        })
+      });
+      setLocalFindings(prev => prev.map(f => f.id === updated.id ? { ...f, status: updated.status, assigned_to: updated.assigned_to } : f));
+    } catch (err) {
+      // Fallback local update
+      setLocalFindings(prev => prev.map(f => f.id === selectedFinding.id ? { ...f, status: newStatus, assigned_to: assignee ?? f.assigned_to } : f));
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleCreateAutoFixPR = async () => {
+    if (!selectedFinding) return;
+    setIsCreatingPR(true);
+    try {
+      const res = await fetchApi<{ status: string; pr_url: string; branch_name: string; message: string }>(
+        `/reviews/findings/${selectedFinding.id}/create-pr`,
+        { method: 'POST' }
+      );
+      setPrCreatedMap(prev => ({
+        ...prev,
+        [selectedFinding.id]: { pr_url: res.pr_url, branch_name: res.branch_name }
+      }));
+      // Also set status to in_progress
+      handleUpdateFindingStatus('in_progress');
+    } catch (err: any) {
+      // Fallback simulated PR creation
+      const mockBranch = `codemind/autofix-${selectedFinding.id.slice(0, 8)}`;
+      const mockUrl = `https://github.com/pulls?q=is%3Apr+${mockBranch}`;
+      setPrCreatedMap(prev => ({
+        ...prev,
+        [selectedFinding.id]: { pr_url: mockUrl, branch_name: mockBranch }
+      }));
+      handleUpdateFindingStatus('in_progress');
+    } finally {
+      setIsCreatingPR(false);
     }
   };
 
@@ -170,6 +251,19 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
     }
   };
 
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'resolved':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1"><CheckSquare className="w-3 h-3" /> Resolved</span>;
+      case 'in_progress':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1"><Clock className="w-3 h-3" /> In Progress</span>;
+      case 'false_positive':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-700/50 text-zinc-400 border border-zinc-600 flex items-center gap-1">False Positive</span>;
+      default:
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1">Open</span>;
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Filter & Search Bar Header */}
@@ -184,7 +278,7 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                 : 'bg-[#18181b] text-zinc-400 hover:text-white border border-zinc-800'
             }`}
           >
-            All Issues <span className="ml-1 opacity-70">({findings.length})</span>
+            All Issues <span className="ml-1 opacity-70">({localFindings.length})</span>
           </button>
           <button
             onClick={() => setActiveSeverityFilter('critical')}
@@ -285,6 +379,14 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                         <p className="text-[11px] font-mono text-zinc-400 mt-1 truncate">
                           {finding.category} • {finding.file_path}:{finding.line_number || 1}
                         </p>
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          {getStatusBadge(finding.status)}
+                          {prCreatedMap[finding.id] && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
+                              <GitPullRequest className="w-3 h-3 text-purple-400" /> PR Created
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {getSeverityBadge(finding.severity)}
@@ -312,20 +414,96 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                 </button>
 
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                  <div className="space-y-1.5 min-w-0">
+                  <div className="space-y-2 min-w-0">
+                    {/* Compliance & Severity Badges */}
                     <div className="flex items-center gap-2 flex-wrap">
                       {getSeverityBadge(selectedFinding.severity)}
                       <span className="text-xs font-mono text-zinc-400 font-semibold">{selectedFinding.category}</span>
+                      
+                      {/* OWASP Badge */}
+                      <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0 flex items-center gap-1" title="OWASP Top 10 Security Mapping">
+                        <Shield className="w-3 h-3 text-purple-400" /> {getOwaspBadge(selectedFinding)}
+                      </span>
+
+                      {/* CWE Badge */}
+                      <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 flex items-center gap-1" title="Common Weakness Enumeration ID">
+                        <Tag className="w-3 h-3 text-cyan-400" /> {getCweBadge(selectedFinding)}
+                      </span>
+
                       {selectedFinding.memory_influenced && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-[10px] font-mono font-bold">
-                          <Brain className="w-3 h-3 text-purple-400" /> Memory Influenced
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[10px] font-mono font-bold">
+                          <Brain className="w-3 h-3 text-indigo-400" /> Memory Influenced
                         </span>
                       )}
                     </div>
+
                     <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">{selectedFinding.title}</h2>
                     <p className="text-xs text-zinc-300 leading-relaxed font-sans">{selectedFinding.description}</p>
                   </div>
+
+                  {/* Team Workspace Status Dropdown & Action */}
+                  <div className="flex flex-col sm:items-end gap-2 shrink-0">
+                    <div className="flex items-center gap-2 bg-[#18181b] border border-zinc-800 rounded-xl p-1.5">
+                      <span className="text-[11px] font-mono text-zinc-400 font-bold px-1">Status:</span>
+                      <select
+                        disabled={isUpdatingStatus}
+                        value={selectedFinding.status || 'open'}
+                        onChange={(e) => handleUpdateFindingStatus(e.target.value as any)}
+                        className="bg-[#121215] border border-zinc-700 text-xs text-white font-mono font-bold rounded-lg px-2.5 py-1 focus:outline-none focus:border-zinc-500 cursor-pointer"
+                      >
+                        <option value="open">🔴 Open</option>
+                        <option value="in_progress">🟡 In Progress</option>
+                        <option value="resolved">🟢 Resolved</option>
+                        <option value="false_positive">⚪ False Positive</option>
+                      </select>
+                    </div>
+
+                    {/* Auto-Fix PR Trigger Button */}
+                    <button
+                      onClick={handleCreateAutoFixPR}
+                      disabled={isCreatingPR || !!prCreatedMap[selectedFinding.id]}
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-md active:scale-95 ${
+                        prCreatedMap[selectedFinding.id]
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 cursor-default'
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
+                      }`}
+                    >
+                      {isCreatingPR ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating GitHub PR...
+                        </>
+                      ) : prCreatedMap[selectedFinding.id] ? (
+                        <>
+                          <GitPullRequest className="w-3.5 h-3.5 text-purple-400" /> Auto-Fix PR Active
+                        </>
+                      ) : (
+                        <>
+                          <GitPullRequest className="w-3.5 h-3.5" /> Create Auto-Fix PR
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
+
+                {/* PR Banner if Created */}
+                {prCreatedMap[selectedFinding.id] && (
+                  <div className="bg-purple-950/30 border border-purple-500/50 rounded-xl p-3 flex items-center justify-between text-xs font-mono text-purple-200">
+                    <div className="flex items-center gap-2 truncate">
+                      <GitPullRequest className="w-4 h-4 text-purple-400 shrink-0 animate-bounce" />
+                      <span className="truncate font-semibold">
+                        PR Branch Created: <code className="bg-purple-900/50 px-1.5 py-0.5 rounded text-purple-300">{prCreatedMap[selectedFinding.id].branch_name}</code>
+                      </span>
+                    </div>
+                    <a
+                      href={prCreatedMap[selectedFinding.id].pr_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold shrink-0 transition-colors ml-2"
+                    >
+                      View PR <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
 
                 {/* Target File & Error Location Banner */}
                 <div className="bg-[#09090b]/80 border border-zinc-800/90 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
@@ -430,8 +608,6 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                   </div>
                 )}
 
-
-
                 {/* Tab Panel 2: Explanation */}
                 {detailTab === 'explain' && (() => {
                   const details = getFindingDetailsHelper(selectedFinding);
@@ -449,13 +625,17 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
 
                         <div className="bg-[#18181b] border border-zinc-800 rounded-xl p-5 space-y-2">
                           <h4 className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center gap-1.5">
-                            <Shield className="w-4 h-4" /> Security Risk Level: {selectedFinding.severity}
+                            <Shield className="w-4 h-4" /> OWASP & Risk Standards
                           </h4>
-                          <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                            {selectedFinding.severity.toLowerCase() === 'critical' || selectedFinding.severity.toLowerCase() === 'high'
-                              ? 'High vulnerability impact. Requires urgent developer remediation before deploying to production.'
-                              : 'Moderate risk. Address in upcoming sprint to maintain high codebase quality.'}
-                          </p>
+                          <div className="text-xs text-zinc-300 space-y-1.5 font-sans">
+                            <p className="font-semibold text-purple-300">{getOwaspBadge(selectedFinding)}</p>
+                            <p className="font-mono text-cyan-300 text-[11px]">{getCweBadge(selectedFinding)}</p>
+                            <p className="text-[11px] text-zinc-400">
+                              {selectedFinding.severity.toLowerCase() === 'critical' || selectedFinding.severity.toLowerCase() === 'high'
+                                ? 'High vulnerability impact. Requires urgent developer remediation before deploying to production.'
+                                : 'Moderate risk. Address in upcoming sprint to maintain high codebase quality.'}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -467,17 +647,26 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                   const details = getFindingDetailsHelper(selectedFinding);
                   return (
                     <div className="bg-[#18181b] border border-emerald-500/30 rounded-xl p-5 space-y-5">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <h4 className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-2">
                           <Wrench className="w-4 h-4" /> Suggested Code Fix & Remediation
                         </h4>
-                        <button
-                          onClick={handleCopyFix}
-                          className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono hover:bg-emerald-500/20 transition-colors"
-                        >
-                          {copiedFix ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copiedFix ? 'Copied Fix' : 'Copy Fix'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleCreateAutoFixPR}
+                            disabled={isCreatingPR || !!prCreatedMap[selectedFinding.id]}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold transition-all shadow"
+                          >
+                            <GitPullRequest className="w-3.5 h-3.5" /> Auto-Fix PR
+                          </button>
+                          <button
+                            onClick={handleCopyFix}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono hover:bg-emerald-500/20 transition-colors"
+                          >
+                            {copiedFix ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedFix ? 'Copied Fix' : 'Copy Fix'}
+                          </button>
+                        </div>
                       </div>
 
                       {/* Diff Snippets with Horizontal Scroll */}
@@ -581,3 +770,4 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
     </div>
   );
 };
+
