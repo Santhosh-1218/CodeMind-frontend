@@ -7,11 +7,19 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(dateString?: string) {
   if (!dateString) return 'N/A';
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  try {
+    const d = new Date(dateString);
+    const formatted = d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${formatted} IST`;
+  } catch (e) {
+    return dateString;
+  }
 }

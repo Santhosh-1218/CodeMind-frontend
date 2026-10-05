@@ -70,17 +70,16 @@ export const ReviewReport: React.FC<ReviewReportProps> = ({ report }) => {
         {/* Top Header Actions */}
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={handleShareLink}
-            className="px-3.5 py-2 rounded-xl bg-[#18181b] hover:bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-mono font-semibold transition-colors flex items-center gap-2"
+            onClick={() => window.print()}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold transition-all flex items-center gap-2 shadow-md hover:scale-105 active:scale-95"
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-            {copiedLink ? 'Link Copied' : 'Share Link'}
+            <Download className="w-3.5 h-3.5 text-emerald-400" /> Export PDF Report
           </button>
           <button
             onClick={handleExportJSON}
-            className="px-3.5 py-2 rounded-xl bg-[#18181b] hover:bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-mono font-semibold transition-colors flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl bg-[#18181b] hover:bg-zinc-800 text-zinc-300 border border-zinc-700 text-xs font-mono font-semibold transition-colors flex items-center gap-2"
           >
-            <Download className="w-3.5 h-3.5" /> Export Report
+            <FileCode className="w-3.5 h-3.5 text-zinc-400" /> Export JSON
           </button>
           {report.repo_url && (
             <a

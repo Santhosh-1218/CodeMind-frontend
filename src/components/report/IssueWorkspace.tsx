@@ -18,6 +18,72 @@ interface IssueWorkspaceProps {
   infoCount: number;
 }
 
+function getFindingDetailsHelper(finding: Finding) {
+  const title = finding.title.toLowerCase();
+  const cat = finding.category.toLowerCase();
+  const desc = finding.description || '';
+  const rat = finding.rationale || '';
+
+  let detailedRationale = rat;
+  let fixGuidance = 'Apply the suggested fix below to remediate this issue safely.';
+  let remediationSteps: string[] = [];
+
+  if (title.includes('api key') || title.includes('secret') || title.includes('hardcoded') || (cat.includes('security') && title.includes('key'))) {
+    if (!detailedRationale || detailedRationale.includes('rule matched') || detailedRationale.length < 20) {
+      detailedRationale = 'Hardcoding private API keys or access secrets directly in source code exposes credentials in public git repositories and production client bundles. Attackers can scrape these keys to impersonate your service, access sensitive data, or exhaust API quotas.';
+    }
+    fixGuidance = 'Store secrets in environment variables (.env files) or cloud key management services. Never commit raw API keys to source control.';
+    remediationSteps = [
+      'Extract the secret token into a local .env file (e.g. API_KEY=your_key_here).',
+      'Replace the hardcoded secret string in source code with process.env.API_KEY (JS/TS) or os.getenv("API_KEY") (Python).',
+      'Ensure .env is listed in your .gitignore file to prevent accidental git commits.',
+      'Revoke and rotate the exposed API key in the provider dashboard immediately.'
+    ];
+  } else if (title.includes('sql injection') || title.includes('sqli') || title.includes('query')) {
+    if (!detailedRationale || detailedRationale.includes('rule matched') || detailedRationale.length < 20) {
+      detailedRationale = 'Constructing SQL queries via dynamic string interpolation allows untrusted user input to manipulate query syntax. Attackers can execute arbitrary SQL commands, bypass authentication, exfiltrate private data, or drop database tables.';
+    }
+    fixGuidance = 'Use parameterized query bindings or Object-Relational Mapping (ORM) parameters to sanitize input automatically.';
+    remediationSteps = [
+      'Replace dynamic f-strings or string concatenation with parameterized placeholders (?, %s, or $1).',
+      'Pass user input parameters as a tuple/array argument in the database execution call.',
+      'Never concatenate raw user-supplied inputs directly into SQL string queries.'
+    ];
+  } else if (title.includes('xss') || title.includes('cross-site scripting') || title.includes('innerhtml')) {
+    if (!detailedRationale || detailedRationale.includes('rule matched') || detailedRationale.length < 20) {
+      detailedRationale = 'Rendering unsanitized user content into HTML DOM elements permits malicious script execution in victim browser sessions, risking session hijacking, token theft, and unauthorized user actions.';
+    }
+    fixGuidance = 'Use safe UI template bindings or sanitize HTML strings before rendering into the DOM.';
+    remediationSteps = [
+      'Use native React JSX expressions {content} which automatically escape HTML entities.',
+      'If HTML insertion is required, sanitize string content using DOMPurify prior to rendering.',
+      'Configure Content-Security-Policy (CSP) headers to restrict unapproved inline script execution.'
+    ];
+  } else if (title.includes('eval') || title.includes('dynamic code') || title.includes('exec')) {
+    if (!detailedRationale || detailedRationale.includes('rule matched') || detailedRationale.length < 20) {
+      detailedRationale = 'Dynamic evaluation of strings as code (via eval, exec, or shell execution) allows arbitrary execution, exposing the host server to complete Remote Code Execution (RCE) takeover.';
+    }
+    fixGuidance = 'Replace dynamic string evaluation with static lookup maps or safe parsing utilities.';
+    remediationSteps = [
+      'Remove all calls to eval(), exec(), or shell=True subprocess execution.',
+      'Use safe data parsing standards such as JSON.parse() or ast.literal_eval().',
+      'Map validated input strings to predefined handler functions.'
+    ];
+  } else {
+    if (!detailedRationale || detailedRationale.includes('rule matched') || detailedRationale.length < 20) {
+      detailedRationale = desc || 'This code pattern introduces potential security, performance, or maintainability risks that should be refactored.';
+    }
+    fixGuidance = 'Review the target file lines and update the code structure according to secure coding standards.';
+    remediationSteps = [
+      'Inspect the target line in the source file.',
+      'Apply the recommended replacement code snippet.',
+      'Re-run automated code review to confirm resolution.'
+    ];
+  }
+
+  return { detailedRationale, fixGuidance, remediationSteps };
+}
+
 export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
   findings,
   files,
@@ -364,60 +430,88 @@ export const IssueWorkspace: React.FC<IssueWorkspaceProps> = ({
                   </div>
                 )}
 
-                {/* Tab Panel 2: Explanation */}
-                {detailTab === 'explain' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-[#18181b] border border-zinc-800 rounded-xl p-5 space-y-2">
-                      <h4 className="text-xs font-mono uppercase tracking-wider text-red-400 font-bold flex items-center gap-1.5">
-                        <AlertTriangle className="w-4 h-4" /> Why This Matters
-                      </h4>
-                      <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                        {selectedFinding.rationale || selectedFinding.description}
-                      </p>
-                    </div>
 
-                    <div className="bg-[#18181b] border border-zinc-800 rounded-xl p-5 space-y-2">
-                      <h4 className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center gap-1.5">
-                        <Shield className="w-4 h-4" /> Severity: {selectedFinding.severity}
-                      </h4>
-                      <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                        High risk of security breach, unauthorized data access, or system instability if left unmitigated.
-                      </p>
+
+                {/* Tab Panel 2: Explanation */}
+                {detailTab === 'explain' && (() => {
+                  const details = getFindingDetailsHelper(selectedFinding);
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-[#18181b] border border-zinc-800 rounded-xl p-5 space-y-2">
+                          <h4 className="text-xs font-mono uppercase tracking-wider text-red-400 font-bold flex items-center gap-1.5">
+                            <AlertTriangle className="w-4 h-4" /> Why This Matters & Cause
+                          </h4>
+                          <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+                            {details.detailedRationale}
+                          </p>
+                        </div>
+
+                        <div className="bg-[#18181b] border border-zinc-800 rounded-xl p-5 space-y-2">
+                          <h4 className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center gap-1.5">
+                            <Shield className="w-4 h-4" /> Security Risk Level: {selectedFinding.severity}
+                          </h4>
+                          <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+                            {selectedFinding.severity.toLowerCase() === 'critical' || selectedFinding.severity.toLowerCase() === 'high'
+                              ? 'High vulnerability impact. Requires urgent developer remediation before deploying to production.'
+                              : 'Moderate risk. Address in upcoming sprint to maintain high codebase quality.'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Tab Panel 3: Suggested Fix */}
-                {detailTab === 'fix' && (
-                  <div className="bg-[#18181b] border border-emerald-500/30 rounded-xl p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-2">
-                        <Wrench className="w-4 h-4" /> Suggested Fix
-                      </h4>
-                      <button
-                        onClick={handleCopyFix}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono hover:bg-emerald-500/20 transition-colors"
-                      >
-                        {copiedFix ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedFix ? 'Copied' : 'Copy Fix'}
-                      </button>
-                    </div>
-
-                    {/* Diff Snippets with Horizontal Scroll */}
-                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 font-mono text-xs space-y-2 overflow-x-auto whitespace-pre">
-                      <div className="text-red-400 bg-red-500/10 p-2.5 rounded border-l-2 border-red-500 min-w-max">
-                        - {selectedFinding.snippet || 'cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")'}
+                {detailTab === 'fix' && (() => {
+                  const details = getFindingDetailsHelper(selectedFinding);
+                  return (
+                    <div className="bg-[#18181b] border border-emerald-500/30 rounded-xl p-5 space-y-5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-2">
+                          <Wrench className="w-4 h-4" /> Suggested Code Fix & Remediation
+                        </h4>
+                        <button
+                          onClick={handleCopyFix}
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono hover:bg-emerald-500/20 transition-colors"
+                        >
+                          {copiedFix ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedFix ? 'Copied Fix' : 'Copy Fix'}
+                        </button>
                       </div>
-                      <div className="text-emerald-400 bg-emerald-500/10 p-2.5 rounded border-l-2 border-emerald-500 min-w-max">
-                        + {selectedFinding.fix_recommendation}
+
+                      {/* Diff Snippets with Horizontal Scroll */}
+                      <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 font-mono text-xs space-y-2.5 overflow-x-auto whitespace-pre">
+                        <div className="text-red-400 bg-red-500/10 p-3 rounded-lg border-l-4 border-red-500 min-w-max">
+                          <div className="text-[10px] uppercase font-bold text-red-400/80 mb-1">Current Vulnerable Code</div>
+                          <code>- {selectedFinding.snippet || 'Vulnerable code pattern detected'}</code>
+                        </div>
+                        <div className="text-emerald-400 bg-emerald-500/10 p-3 rounded-lg border-l-4 border-emerald-500 min-w-max">
+                          <div className="text-[10px] uppercase font-bold text-emerald-400/80 mb-1">Recommended Replacement</div>
+                          <code>+ {selectedFinding.fix_recommendation}</code>
+                        </div>
+                      </div>
+
+                      {/* Guidance Box */}
+                      <div className="space-y-3 pt-2">
+                        <p className="text-xs text-emerald-300 leading-relaxed font-sans font-semibold">
+                          💡 {details.fixGuidance}
+                        </p>
+
+                        <div className="bg-[#121215] border border-zinc-800 rounded-xl p-4 space-y-2">
+                          <h5 className="text-xs font-mono uppercase text-zinc-400 font-bold">Step-by-Step Remediation Checklist:</h5>
+                          <ol className="space-y-1.5 text-xs text-zinc-300 font-sans list-decimal list-inside">
+                            {details.remediationSteps.map((step, idx) => (
+                              <li key={idx} className="leading-relaxed">
+                                <span className="text-zinc-200">{step}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
                       </div>
                     </div>
-
-                    <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                      Use parameterized queries or safe React/DOM bindings to prevent injection attacks and ensure proper sanitization.
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Tab Panel 4: Hindsight Memory */}
                 {detailTab === 'memory' && selectedFinding.memory_influenced && (
