@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { UserProfile } from '@/types/auth';
-import { fetchApi } from '@/lib/api';
+import { fetchApi, clearApiCache } from '@/lib/api';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
+      clearApiCache();
       const data = await fetchApi<UserProfile>('/auth/me');
       setUser(data);
     } catch (e) {
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
       if (token) {
+        clearApiCache();
         localStorage.setItem('codemind_token', token);
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, pass: string) => {
+    clearApiCache();
     const res = await fetchApi<{ token: string; user: UserProfile }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password: pass })
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (full_name: string, email: string, pass: string) => {
+    clearApiCache();
     const res = await fetchApi<{ token: string; user: UserProfile }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ full_name, email, password: pass })
@@ -68,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    clearApiCache();
     try {
       await fetchApi('/auth/logout', { method: 'POST' });
     } catch (e) {}

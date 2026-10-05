@@ -32,8 +32,9 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   const token = typeof window !== 'undefined' ? localStorage.getItem('codemind_token') : null;
   const cacheKey = `${token || 'guest'}:${endpoint}`;
 
-  // Serve instantly from cache if available and fresh
-  if (method === 'GET') {
+  // Serve instantly from cache if available and fresh (exclude auth and profile endpoints)
+  const isAuthOrProfile = endpoint.includes('/auth/') || endpoint.includes('/users/');
+  if (method === 'GET' && !isAuthOrProfile) {
     const cached = apiCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
       return cached.data as T;
