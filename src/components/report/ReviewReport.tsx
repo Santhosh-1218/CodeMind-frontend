@@ -13,6 +13,7 @@ import { AnalyticsRow } from './AnalyticsRow';
 import { IssueWorkspace } from './IssueWorkspace';
 import { MemoryLearningFlow } from './MemoryLearningFlow';
 import { CodeViewer } from './CodeViewer';
+import { CodeInspector } from './CodeInspector';
 import { Button } from '../ui/Button';
 
 interface ReviewReportProps {
@@ -164,35 +165,7 @@ export const ReviewReport: React.FC<ReviewReportProps> = ({ report }) => {
 
       {/* Tab Panel 3: Code Inspector */}
       {activeTab === 'files' && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* File Picker Sidebar */}
-          <div className="bg-[#121215]/90 backdrop-blur-xl border border-zinc-800 rounded-2xl p-4 space-y-1">
-            <h4 className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-3 px-2 font-bold">Project Files</h4>
-            {report.files.map((file) => (
-              <button
-                key={file.id}
-                onClick={() => setSelectedFile(file)}
-                className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-mono truncate transition-colors flex items-center justify-between ${
-                  selectedFile?.id === file.id
-                    ? 'bg-zinc-800 text-white font-bold border border-zinc-700'
-                    : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
-                }`}
-              >
-                <span className="truncate">{file.path}</span>
-                <span className="text-[10px] text-zinc-500 uppercase">{file.language}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Monaco Viewer */}
-          <div className="lg:col-span-3">
-            {selectedFile ? (
-              <CodeViewer file={selectedFile} />
-            ) : (
-              <div className="p-12 text-center text-zinc-500 text-xs font-mono">Select a file to inspect source code</div>
-            )}
-          </div>
-        </div>
+        <CodeInspector files={report.files} findings={report.findings} />
       )}
     </div>
   );
