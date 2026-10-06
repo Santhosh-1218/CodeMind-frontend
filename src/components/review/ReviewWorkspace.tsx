@@ -14,16 +14,24 @@ export const ReviewWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'github' | 'zip'>('github');
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [fullReport, setFullReport] = useState<ReviewReportType | null>(null);
+  const [showReport, setShowReport] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { status: currentStatus } = useReviewStatus(activeReviewId);
 
-  // When status transitions to Completed, fetch full report
+  // When status transitions to Completed, fetch full report and schedule smooth transition
   React.useEffect(() => {
     if (currentStatus && currentStatus.status === 'Completed' && activeReviewId && !fullReport) {
       fetchApi<ReviewReportType>(`/reviews/${activeReviewId}`)
-        .then(setFullReport)
+        .then((report) => {
+          setFullReport(report);
+          // Briefly display completed 100% progress screen before opening report
+          const timer = setTimeout(() => {
+            setShowReport(true);
+          }, 1500);
+          return () => clearTimeout(timer);
+        })
         .catch((err) => setError(err.message));
     }
   }, [currentStatus, activeReviewId, fullReport]);
@@ -32,6 +40,7 @@ export const ReviewWorkspace: React.FC = () => {
     setLoading(true);
     setError(null);
     setFullReport(null);
+    setShowReport(false);
 
     try {
       const res = await fetchApi<ReviewStatus>('/reviews/github', {
@@ -50,6 +59,7 @@ export const ReviewWorkspace: React.FC = () => {
     setLoading(true);
     setError(null);
     setFullReport(null);
+    setShowReport(false);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -67,7 +77,7 @@ export const ReviewWorkspace: React.FC = () => {
     }
   };
 
-  if (fullReport) {
+  if (fullReport && showReport) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ReviewReport report={fullReport} />
@@ -75,10 +85,24 @@ export const ReviewWorkspace: React.FC = () => {
     );
   }
 
-  if (activeReviewId && currentStatus && currentStatus.status !== 'Completed') {
+  if (activeReviewId && currentStatus) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <ReviewProgress status={currentStatus} />
+        <ReviewProgress
+          status={currentStatus}
+          onReset={() => {
+            setActiveReviewId(null);
+            setFullReport(null);
+            setShowReport(false);
+          }}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            setActiveReviewId(null);
+            setFullReport(null);
+            setShowReport(false);
+          }}
+          onViewReport={() => setShowReport(true)}
+        />
       </div>
     );
   }

@@ -24,7 +24,7 @@ export function useReviewStatus(reviewId: string | null) {
           setError(null);
 
           if (data.status !== 'Completed' && data.status !== 'Failed') {
-            timer = setTimeout(checkStatus, 2000);
+            timer = setTimeout(checkStatus, 750);
           }
         }
       } catch (err: any) {
